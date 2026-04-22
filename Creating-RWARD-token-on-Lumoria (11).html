@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Playables SDK -->
+<script>// Playables SDK v1.0.0
+// Game lifecycle bridge: rAF-based game-ready detection + event communication
+(function() {
+  'use strict';
+
+  // Idempotency: skip if already initialized (e.g., server-side injection
+  // followed by client-side inject-javascript via the Bloks webview component).
+  if (window.playablesSDK) return;
+
+  var HANDLER_NAME = 'playablesGameEventHandler';
+  var ANDROID_BRIDGE_NAME = '_MetaPlayablesBridge';
+  var RAF_FRAME_THRESHOLD = 3;
+
+  var gameReadySent = false;
+  var firstInteractionSent = false;
+  var errorSent = false;
+  var frameCount = 0;
+  var originalRAF = window.requestAnimationFrame;
+
+  // --- Transport Layer ---
+
+  function hasIOSBridge() {
+    return !!(window.webkit &&
+              window.webkit.messageHandlers &&
+              window.webkit.messageHandlers[HANDLER_NAME]);
+  }
+
+  function hasAndroidBridge() {
+    return !!(window[ANDROID_BRIDGE_NAME] &&
+              typeof window[ANDROID_BRIDGE_NAME].postEvent === 'function');
+  }
+
+  function isInIframe() {
+    return !!(window.parent && window.parent !== window);
+  }
+
+  function sendEvent(eventName, payload) {
+    var message = {
+      type: eventName,
+      payload: payload || {},
+      timestamp: Date.now()
+    };
+
+    if (hasIOSBridge()) {
+      try {
+        window.webkit.messageHandlers[HANDLER_NAME].postMessage(message);
+      } catch (e) { /* ignore */ }
+      return;
+    }
+
+    if (hasAndroidBridge()) {
+    try {
+      var p = payload || {};
+      p.__secureToken = window.__fbAndroidBridgeAuthToken || '';
+      window[ANDROID_BRIDGE_NAME].postEvent(
+        eventName,
+        JSON.stringify(p)
+      );
+    } catch (e) { /* ignore */ }
+    return;
+  }
+
+    if (isInIframe()) {
+      try {
+        window.parent.postMessage(message, '*');
+      } catch (e) { /* ignore */ }
+      return;
+    }
+  }
+
+  // --- rAF Game-Ready Detection ---
+
+  function onFrame() {
+    if (gameReadySent) return;
+
+    frameCount++;
+    if (frameCount >= RAF_FRAME_THRESHOLD) {
+      gameReadySent = true;
+      sendEvent('game_ready', {
+        frame_count: frameCount,
+        detected_at: Date.now()
+      });
+      return;
+    }
+
+    originalRAF.call(window, onFrame);
+  }
+
+  if (originalRAF) {
+    window.requestAnimationFrame = function(callback) {
+      if (!gameReadySent) {
+        return originalRAF.call(window, function(timestamp) {
+          frameCount++;
+          if (frameCount >= RAF_FRAME_THRESHOLD && !gameReadySent) {
+            gameReadySent = true;
+            sendEvent('game_ready', {
+              frame_count: frameCount,
+              detected_at: Date.now()
+            });
+          }
+          callback(timestamp);
+        });
+      }
+      return originalRAF.call(window, callback);
+    };
+  }
+
+  // --- First User Interaction Detection ---
+
+  function setupFirstInteractionDetection() {
+    var events = ['touchstart', 'mousedown', 'keydown'];
+
+    function onFirstInteraction() {
+      if (firstInteractionSent) return;
+      firstInteractionSent = true;
+      sendEvent('user_interaction_start', null);
+
+      for (var i = 0; i < events.length; i++) {
+        document.removeEventListener(events[i], onFirstInteraction, true);
+      }
+    }
+
+    for (var i = 0; i < events.length; i++) {
+      document.addEventListener(events[i], onFirstInteraction, true);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupFirstInteractionDetection);
+  } else {
+    setupFirstInteractionDetection();
+  }
+
+  // --- Auto Error Capture ---
+
+  window.addEventListener('error', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    sendEvent('error', {
+      message: event.message || 'Unknown error',
+      source: event.filename || '',
+      lineno: event.lineno || 0,
+      colno: event.colno || 0,
+      auto_captured: true
+    });
+  });
+
+  window.addEventListener('unhandledrejection', function(event) {
+    if (errorSent) return;
+    errorSent = true;
+    var reason = event.reason;
+    sendEvent('error', {
+      message: (reason instanceof Error) ? reason.message : String(reason),
+      type: 'unhandled_promise_rejection',
+      auto_captured: true
+    });
+  });
+
+  // --- Public API ---
+
+  window.playablesSDK = {
+    complete: function(score) {
+      sendEvent('game_ended', {
+        score: score,
+        completed: true
+      });
+    },
+
+    error: function(message) {
+      if (errorSent) return;
+      errorSent = true;
+      sendEvent('error', {
+        message: message || 'Unknown error',
+        auto_captured: false
+      });
+    },
+
+    sendEvent: function(eventName, payload) {
+      if (!eventName || typeof eventName !== 'string') return;
+      sendEvent(eventName, payload);
+    }
+  };
+
+  // Kick off rAF detection in case no game code calls rAF immediately
+  if (originalRAF) {
+    originalRAF.call(window, onFrame);
+  }
+})();</script>
+<script>window.Intl=window.Intl||{};Intl.t=function(s){return(Intl._locale&&Intl._locale[s])||s;};</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>sRWARD — Pre-TGE Seed Token | 1:1.25 to $RWD</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fragment+Mono:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #050507; }
+  .mono { font-family: 'Fragment Mono', ui-monospace, SFMono-Regular, monospace; }
+  .gold { background: linear-gradient(180deg, #F8E7B8 0%, #E6C268 35%, #C99A3D 70%, #9E7328 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .gold-border { border-color: rgba(230, 194, 104, 0.35); }
+  .card { background: linear-gradient(180deg, rgba(20,20,24,0.9) 0%, rgba(13,13,17,0.9) 100%); border: 1px solid rgba(255,255,255,0.08); }
+  .card:hover { border-color: rgba(230,194,104,0.25); box-shadow: 0 0 0 1px rgba(230,194,104,0.1) inset, 0 10px 40px -15px rgba(0,0,0,0.8); }
+  .grid-bg { background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px); background-size: 56px 56px; }
+
+  @media (max-width: 640px) {
+    body { font-size: 16px; line-height: 1.5; }
+    .card { border-radius: 16px !important; }
+    .grid-bg { background-size: 40px 40px; }
+    h1 { letter-spacing: -0.01em; }
+    table { font-size: 14px; }
+    .mono { font-size: 13px; }
+  }
+
+</style>
+</head>
+<body class="text-white antialiased selection:bg-amber-400/20 selection:text-amber-100">
+  <div class="relative min-h-screen overflow-hidden">
+    <!-- Background -->
+    <div class="absolute inset-0">
+      <div class="absolute inset-0 bg-[radial-gradient(800px_400px_at_50%_-10%,rgba(230,194,104,0.18),transparent_60%),radial-gradient(600px_300px_at_85%_15%,rgba(212,175,55,0.12),transparent_50%),radial-gradient(500px_300px_at_15%_20%,rgba(212,175,55,0.08),transparent_50%)]"></div>
+      <div class="absolute inset-0 grid-bg opacity-[0.25] [mask-image:radial-gradient(ellipse_at_center,black_40%,transparent_70%)]"></div>
+      <div class="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-400/50 to-transparent"></div>
+    </div>
+
+    <div class="relative z-10 max-w-[1440px] mx-auto px-4 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
+      <!-- Header -->
+      <header class="flex items-start justify-between gap-6">
+        <div>
+          <div class="flex items-center gap-3 mb-3">
+            <div class="h-8 w-8 rounded-lg bg-zinc-900 border border-white/10 flex items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 3L20 8v8l-8 5-8-5V8l8-5Z" stroke="#E6C268" stroke-width="1.5" fill="none"/></svg>
+            </div>
+            <span class="text-[15px] tracking-[0.18em] uppercase text-white font-semibold">RWARD LABS • SEED</span>
+          </div>
+          <h1 class="text-[28px] sm:text-[32px] md:text-[44px] leading-[1.05] font-semibold tracking-tight">
+            <span class="gold">sRWARD</span> — Pre-TGE Seed Token
+          </h1>
+          <div class="mt-3 flex items-center gap-3">
+            <p class="text-white text-[15px] md:text-[17px]">Converts to $RWD at Pre Token Generation Event</p>
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-200/90 text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] font-medium tracking-wide">
+              <span class="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+              1 : 1.25 RATIO
+            </span>
+          </div>
+        </div>
+        <div class="hidden md:block text-right">
+          <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-widest text-white">Confidential</div>
+          <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-widest text-white mt-1">Investor Materials</div>
+        </div>
+      </header>
+
+      <!-- Main Grid -->
+      <main class="mt-10 lg:mt-14 grid grid-cols-1 xl:grid-cols-12 gap-5 lg:gap-6">
+        
+        <!-- Section 1 -->
+        <section class="xl:col-span-4 card rounded-[20px] p-5 sm:p-6 lg:p-7 transition-all duration-300">
+          <div class="flex flex-wrap items-center justify-center gap-3 sm:justify-between mb-6">
+            <h2 class="text-[18px] sm:text-[16px] uppercase tracking-[0.14em] text-white font-bold">01 — Sale Structure</h2>
+            <div class="h-6 w-6 rounded-md bg-zinc-900 border border-white/5 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="1.5"><path d="M12 6v12M6 12h12"/></svg>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-x-6 gap-y-7">
+            <div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white mb-1.5">Max Supply</div>
+              <div class="text-[28px] leading-none font-semibold gold tracking-tight">30,000,000</div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] text-white mt-1">sRWARD</div>
+            </div>
+            <div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white mb-1.5">Price</div>
+              <div class="text-[28px] leading-none font-semibold gold tracking-tight">$0.10</div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] text-white mt-1">per token</div>
+            </div>
+            <div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white mb-1.5">Hardcap</div>
+              <div class="text-[26px] leading-none font-semibold text-white tracking-tight">$3,000,000</div>
+            </div>
+            <div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white mb-1.5">Softcap</div>
+              <div class="text-[26px] leading-none font-semibold text-white tracking-tight">$1,000,000</div>
+              <div class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] text-white mt-1">proceed threshold</div>
+            </div>
+          </div>
+
+          <div class="h-px w-full bg-gradient-to-r from-transparent via-white/10 to-transparent my-6"></div>
+
+          <div class="space-y-3.5">
+            <div class="flex gap-3">
+              <div class="mt-0.5 h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E6C268" stroke-width="2"><path d="M5 12h14M12 5v14"/></svg>
+              </div>
+              <div>
+                <div class="text-[14px] sm:text-[13px] text-white">Chain: <span class="text-white font-medium">BNB Chain via Lumoria</span></div>
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <div class="mt-0.5 h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E6C268" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <div>
+                <div class="text-[14px] sm:text-[13px] text-white"><span class="text-white font-medium">99% sell tax</span> = non-transferable until TGE</div>
+              </div>
+            </div>
+            <div class="flex gap-3">
+              <div class="mt-0.5 h-6 w-6 sm:h-5 sm:w-5 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shrink-0">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#E6C268" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              </div>
+              <div>
+                <div class="text-[14px] sm:text-[13px] text-white">Funds held in <span class="text-white font-medium">multisig wallet (Safe) managed by Ledgity</span></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 2 -->
+        <section class="xl:col-span-4 card rounded-[20px] p-5 sm:p-6 lg:p-7 transition-all duration-300">
+          <div class="flex flex-wrap items-center justify-center gap-3 sm:justify-between mb-6">
+            <h2 class="text-[18px] sm:text-[16px] uppercase tracking-[0.14em] text-white font-bold">02 — How Conversion Works</h2>
+            <div class="h-6 w-6 rounded-md bg-zinc-900 border border-white/5 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="1.5"><path d="M7 16V4M7 4L3 8M7 4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"/></svg>
+            </div>
+          </div>
+
+          <!-- Visual Flow -->
+          <div class="relative rounded-xl bg-black/40 border border-white/[0.06] p-5 overflow-hidden">
+            <div class="absolute inset-0 bg-[radial-gradient(200px_100px_at_50%_0%,rgba(230,194,104,0.12),transparent)] pointer-events-none"></div>
+            <div class="relative">
+              <div class="flex flex-wrap items-center justify-center gap-3 sm:justify-between gap-2">
+                <div class="flex flex-col items-center text-center">
+                  <div class="h-12 w-12 sm:h-11 sm:w-11 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d4d4d8" stroke-width="1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  </div>
+                  <span class="mt-2 text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white font-bold">Investor</span>
+                </div>
+
+                <svg class="w-6 h-6 text-white shrink-0" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>
+
+                <div class="flex flex-col items-center text-center">
+                  <div class="h-12 w-12 sm:h-11 sm:w-11 rounded-xl bg-zinc-900 border border-white/10 flex items-center justify-center">
+                    <span class="text-lg font-medium text-white">$</span>
+                  </div>
+                  <span class="mt-2 text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white font-bold">USD</span>
+                </div>
+
+                <svg class="w-6 h-6 text-white shrink-0" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"/></svg>
+
+                <div class="flex flex-col items-center text-center">
+                  <div class="h-12 w-12 sm:h-11 sm:w-11 rounded-xl bg-amber-500/10 border gold-border flex items-center justify-center shadow-[0_0_20px_rgba(230,194,104,0.15)_inset]">
+                    <span class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] font-semibold tracking-widest text-amber-200">sRWARD</span>
+                  </div>
+                  <span class="mt-2 text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-amber-200 font-bold">pre-TGE</span>
+                </div>
+              </div>
+
+                <div class="my-4 flex items-center gap-3">
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+                <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-[0.18em] text-white px-2 py-1 rounded-full border border-white/10 bg-zinc-900/60">at pre-TGE • burn</div>
+                <div class="h-px flex-1 bg-gradient-to-r from-transparent via-white/10 to-transparent"></div>
+              </div>
+
+              <div class="flex items-center justify-center">
+                <div class="relative">
+                  <div class="absolute -inset-3 bg-amber-500/20 blur-2xl rounded-full"></div>
+                  <div class="relative h-14 px-6 rounded-2xl bg-gradient-to-b from-[#F5E1A4] to-[#C99A3D] text-black flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.4),0_10px_30px_rgba(201,154,61,0.25)]">
+                    <span class="text-[17px] font-semibold tracking-wide">$RWD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 space-y-3">
+            <div class="flex items-start gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><path d="M20 6L9 17l-5-5" stroke="#E6C268" stroke-width="1.75" stroke-linecap="round"/></svg>
+              <p class="text-[15px] sm:text-[14px] leading-snug text-white"><span class="text-white font-medium">Ratio:</span> 1 sRWARD = <span class="gold font-semibold">1.25 $RWD</span></p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><path d="M20 6L9 17l-5-5" stroke="#E6C268" stroke-width="1.75" stroke-linecap="round"/></svg>
+              <p class="text-[15px] sm:text-[14px] leading-snug text-white"><span class="text-white font-medium">Source:</span> $RWD Genesis Pool (100M, one-time mint)</p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><path d="M20 6L9 17l-5-5" stroke="#E6C268" stroke-width="1.75" stroke-linecap="round"/></svg>
+              <p class="text-[15px] sm:text-[14px] leading-snug text-white">sRWARD is <span class="text-white font-medium">burned on conversion</span>, cannot exist after pre-TGE</p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><path d="M20 6L9 17l-5-5" stroke="#E6C268" stroke-width="1.75" stroke-linecap="round"/></svg>
+              <p class="text-[15px] sm:text-[14px] leading-snug text-white">$RWD total supply fixed at <span class="text-white font-medium">1B</span>, 10-year bittensor-style emission, no further mint</p>
+            </div>
+            <div class="flex items-start gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="mt-0.5 shrink-0"><path d="M20 6L9 17l-5-5" stroke="#E6C268" stroke-width="1.75" stroke-linecap="round"/></svg>
+              <p class="text-[15px] sm:text-[14px] leading-snug text-white">Conversion executed by multisig wallet (Safe), auditable on-chain</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 3 -->
+        <section class="xl:col-span-4 card rounded-[20px] p-5 sm:p-6 lg:p-7 transition-all duration-300">
+          <div class="flex flex-wrap items-center justify-center gap-3 sm:justify-between mb-5">
+            <h2 class="text-[18px] sm:text-[16px] uppercase tracking-[0.14em] text-white font-bold">03 — What If We Raise Less?</h2>
+            <div class="h-6 w-6 rounded-md bg-zinc-900 border border-white/5 flex items-center justify-center">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9a9a9a" stroke-width="1.5"><path d="M3 3v18h18"/><path d="M7 16l4-4 4 4 4-8"/></svg>
+            </div>
+          </div>
+
+          <div class="overflow-hidden rounded-xl border border-white/10 bg-black/30">
+            <div class="overflow-x-auto">
+              <table class="w-full text-[14px] sm:text-[13px]">
+                <thead class="bg-white/[0.03] border-b border-white/10">
+                  <tr class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white">
+                    <th class="text-left font-medium px-4 py-2.5">Raise</th>
+                    <th class="text-right font-medium px-3 py-2.5">sRWARD Issued</th>
+                    <th class="text-right font-medium px-3 py-2.5">$RWD Delivered</th>
+                    <th class="text-right font-medium px-4 py-2.5">Unsold sRWARD</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/[0.04]">
+                  <tr class="bg-amber-500/[0.06] hover:bg-amber-500/[0.09] transition-colors">
+                    <td class="px-4 py-3"><span class="font-medium text-white">$3.0M</span> <span class="text-white text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px]">(max)</span></td>
+                    <td class="px-3 py-3 text-right mono text-white">30.0M</td>
+                    <td class="px-3 py-3 text-right mono"><span class="gold font-medium">37.5M</span></td>
+                    <td class="px-4 py-3 text-right mono text-white">0</td>
+                  </tr>
+                  <tr class="hover:bg-white/[0.02] transition-colors">
+                    <td class="px-4 py-3"><span class="font-medium text-white">$2.0M</span></td>
+                    <td class="px-3 py-3 text-right mono text-white">20.0M</td>
+                    <td class="px-3 py-3 text-right mono text-white">25.0M</td>
+                    <td class="px-4 py-3 text-right mono text-white">10.0M</td>
+                  </tr>
+                  <tr class="hover:bg-white/[0.02] transition-colors">
+                    <td class="px-4 py-3"><span class="font-medium text-white">$1.5M</span></td>
+                    <td class="px-3 py-3 text-right mono text-white">15.0M</td>
+                    <td class="px-3 py-3 text-right mono text-white">18.75M</td>
+                    <td class="px-4 py-3 text-right mono text-white">15.0M</td>
+                  </tr>
+                  <tr class="hover:bg-white/[0.02] transition-colors">
+                    <td class="px-4 py-3"><span class="font-medium text-white">$1.0M</span> <span class="text-white text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px]">(min)</span></td>
+                    <td class="px-3 py-3 text-right mono text-white">10.0M</td>
+                    <td class="px-3 py-3 text-right mono text-white">12.5M</td>
+                    <td class="px-4 py-3 text-right mono text-white">20.0M</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="mt-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-400/20 relative overflow-hidden">
+            <div class="absolute inset-0 bg-[radial-gradient(300px_80px_at_50%_0%,rgba(230,194,104,0.15),transparent)] pointer-events-none"></div>
+            <div class="relative flex gap-2.5">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" class="shrink-0 mt-0.5"><path d="M12 9v4M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke="#E6C268" stroke-width="1.5" stroke-linecap="round"/></svg>
+              <p class="text-[14px] leading-snug text-amber-100/90"><span class="font-medium text-amber-200">Unsold sRWARD is never minted.</span> Corresponding $RWD remains unallocated in genesis and is burned at pre-TGE.</p>
+            </div>
+          </div>
+
+          <div class="mt-5 grid grid-cols-3 gap-3">
+            <div class="rounded-lg bg-white/[0.02] border border-white/5 p-3 text-center">
+              <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white">Supply Cap</div>
+              <div class="mt-1 text-[15px] font-medium text-white">Fixed</div>
+            </div>
+            <div class="rounded-lg bg-white/[0.02] border border-white/5 p-3 text-center">
+              <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white">Mint</div>
+              <div class="mt-1 text-[15px] font-medium text-white">One-time</div>
+            </div>
+            <div class="rounded-lg bg-white/[0.02] border border-white/5 p-3 text-center">
+              <div class="text-[14px] sm:text-[13px] sm:text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-wider text-white">Audit</div>
+              <div class="mt-1 text-[15px] font-medium text-white">On-chain</div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Footer -->
+      <footer class="mt-10 lg:mt-14 pt-6 border-t border-white/10">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <p class="text-[14px] sm:text-[14px] sm:text-[13px] leading-relaxed text-white max-w-3xl">
+            <span class="text-white font-medium">sRWARD is a pre-TGE utility token, not equity in RWARD Labs.</span> sRWARD provides early $RWD access only.
+          </p>
+          <div class="flex items-center gap-3 shrink-0">
+            <span class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-widest text-white">BNB Chain</span>
+            <span class="h-1 w-1 rounded-full bg-zinc-700"></span>
+            <span class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-widest text-white">Lumoria</span>
+            <span class="h-1 w-1 rounded-full bg-zinc-700"></span>
+            <span class="text-[14px] sm:text-[14px] sm:text-[14px] sm:text-[13px] uppercase tracking-widest text-white">Safe</span>
+          </div>
+        </div>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>
